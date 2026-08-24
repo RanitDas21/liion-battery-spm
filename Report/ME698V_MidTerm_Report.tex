@@ -1,0 +1,303 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{siunitx}
+\usepackage{caption}
+
+\definecolor{codebg}{RGB}{247,247,247}
+\definecolor{codekw}{RGB}{0,90,160}
+\definecolor{codestr}{RGB}{140,20,20}
+\definecolor{codecmt}{RGB}{90,90,90}
+
+\lstdefinestyle{py}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecmt}\itshape,
+  stringstyle=\color{codestr},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=8pt,
+  breaklines=true,
+  showstringspaces=false,
+  frame=single,
+  rulecolor=\color{gray!40},
+  language=Python,
+  tabsize=4,
+  captionpos=b
+}
+
+\title{\vspace{-1.5cm}ME698V: Physics-Based Modeling of Li-ion Batteries \\[4pt]
+\large Mid-Term Project \\[2pt]
+\large Development of a Single-Particle Model (SPM) for \\
+Carbon $|$ LiPF\textsubscript{6} Electrolyte $|$ NMC111 Li-ion Cells}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1cm}
+
+\section*{Project Statement}
+A commercial electric vehicle (EV) manufacturer requires a mathematical model for the Carbon $|$ LiPF\textsubscript{6}
+Electrolyte $|$ NMC111 cell used in their EV powertrain. A single-particle model (SPM) is developed in three stages:
+(i) the Carbon $|$ LiPF\textsubscript{6} $|$ Li half-cell is modeled following Verbrugge and Koch's thermodynamic
+interaction formalism; (ii) the NMC111 $|$ LiPF\textsubscript{6} $|$ Li half-cell is modeled with an analogous
+formalism and its interaction parameters fit to the reported voltage-capacity data; (iii) the two half-cell models
+are combined into a full-cell response, first at equilibrium and then including Butler--Volmer kinetics at the
+particle surface.
+
+\section{Carbon Anode Half-Cell}
+
+\subsection{Chemical potential and governing equation}
+Following Verbrugge and Koch, the chemical potential of intercalated lithium in the carbon host is
+\begin{equation}
+\mu_{\mathrm{Li}} = \mu_{\mathrm{Li}}^{0} + RT\ln\!\left(\frac{c}{1-c}\right) + \sum_{k=2}^{7} k\,\Omega_k^{a}\,c^{\,k-1},
+\qquad 0\le c \le 1,
+\end{equation}
+where $c$ is the fractional occupancy and $\Omega_k^{a}$ are the anode interaction coefficients. The flux is driven
+by the chemical-potential gradient,
+\begin{equation}
+N = -\frac{Dc}{RT}\nabla \mu_{\mathrm{Li}} = -D\!\left(c\,\frac{d\mu_{\mathrm{Li}}}{dc}\right)\nabla c .
+\end{equation}
+Differentiating,
+\begin{equation}
+c\,\frac{d\mu_{\mathrm{Li}}}{dc} = \frac{RT}{1-c} + \sum_{k=2}^{7} k(k-1)\,\Omega_k^{a}\,c^{\,k-1},
+\end{equation}
+so that $N = -D_{\mathrm{eff}}(c)\,\nabla c$ with the thermodynamic-factor-corrected diffusivity
+\begin{equation}
+D_{\mathrm{eff}}(c) = D\left[\frac{1}{1-c} + \frac{1}{RT}\sum_{k=2}^{7} k(k-1)\,\Omega_k^{a}\,c^{\,k-1}\right].
+\label{eq:Deff_anode}
+\end{equation}
+For the single particle (spherical geometry, radial transport only), the material balance is
+\begin{equation}
+\frac{\partial c}{\partial t} = -\nabla\cdot N = \frac{1}{r^2}\frac{\partial}{\partial r}
+\left(r^2 D_{\mathrm{eff}}(c)\,\frac{\partial c}{\partial r}\right).
+\label{eq:pde_anode}
+\end{equation}
+
+\subsection{Boundary and initial conditions}
+Symmetry at the particle center and continuity of the intercalation flux with the imposed current density
+$i_{\mathrm{app}}$ at the surface ($i_{\mathrm{app}}>0$ denotes Li insertion / lithiation) give
+\begin{align}
+\left.\frac{\partial c}{\partial r}\right|_{r=0} &= 0, \\
+\left.\frac{\partial c}{\partial r}\right|_{r=R} &= \frac{i_{\mathrm{app}}}{F\,D_{\mathrm{eff}}(c_s)}, \qquad c_s \equiv c(R,t),
+\label{eq:bc_anode}
+\end{align}
+with initial condition $c(r,0) = c_0 = 5.0\times10^{-4}$ (uniform).
+
+\subsection{Cell voltage}
+With the exchange current density taken large compared to $i_{\mathrm{app}}$ ($\eta \approx 0$), the cell voltage
+relative to a Li metal reference is
+\begin{equation}
+V = U^{s} + \frac{RT}{F}\ln\!\left(\frac{1-c_s}{c_s}\right) - \frac{1}{F}\sum_{k=2}^{7} k\,\Omega_k^{a}\,c_s^{\,k-1}.
+\label{eq:V_anode}
+\end{equation}
+
+\subsection{Parameters and implementation}
+Table~\ref{tab:anode_params} lists the parameters used, taken from Tables I and II of Verbrugge and Koch (1996).
+Equations~\eqref{eq:Deff_anode}--\eqref{eq:V_anode} were implemented in PyBaMM as a custom \texttt{BaseModel} on a
+spherical particle domain, discretized with the finite-volume method (50 nodes) and integrated with the default
+solver for $i_{\mathrm{app}} = +1.0~\si{mA/cm^2}$.
+
+\begin{table}[h]
+\centering
+\caption{Carbon anode parameters (Verbrugge and Koch, 1996).}
+\label{tab:anode_params}
+\begin{tabular}{lll}
+\toprule
+Parameter & Symbol & Value \\
+\midrule
+Particle radius & $R$ & \SI{3.5}{\micro\metre} \\
+Site concentration & $c_{\max}$ & \SI{18000}{mol/m^3} \\
+Guest diffusivity & $D$ & $1\times10^{-14}~\si{m^2/s}$ \\
+Standard potential & $U^{s}$ & \SI{0.8170}{V} \\
+$\Omega_2^{a}/F,\ldots,\Omega_7^{a}/F$ & --- & $0.9926,\ 0.8981,\ -5.630,\ 8.595,\ -5.784,\ 1.468$~V \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.72\linewidth]{Problem1_updated.png}
+\caption{Simulated and experimental (Table 1) voltage vs. average occupancy for the carbon half-cell,
+$i_{\mathrm{app}} = 1.0~\si{mA/cm^2}$.}
+\label{fig:p1}
+\end{figure}
+
+The simulated charging curve reproduces the experimental data of Fig.~1(a) closely across the full occupancy range
+(Fig.~\ref{fig:p1}), confirming that the thermodynamic-factor-corrected diffusivity of Eq.~\eqref{eq:Deff_anode}
+combined with the equilibrium voltage relation of Eq.~\eqref{eq:V_anode} captures the strongly non-ideal
+intercalation behavior reported by Verbrugge and Koch.
+\clearpage
+\section{NMC111 Cathode Half-Cell}
+
+\subsection{Chemical potential and governing equation}
+The chemical potential of lithium in NMC111 is written with the interaction sum evaluated in the vacancy fraction,
+\begin{equation}
+\mu_{\mathrm{Li}} = \mu_{\mathrm{Li}}^{0} + RT\ln\!\left(\frac{c}{1-c}\right) - \sum_{k=2}^{7} k\,\Omega_k^{c}\,(1-c)^{\,k-1},
+\end{equation}
+where $c$ is again the fractional occupancy of Li in the host. Proceeding exactly as in Section 1,
+\begin{equation}
+c\,\frac{d\mu_{\mathrm{Li}}}{dc} = \frac{RT}{1-c} + \sum_{k=2}^{7} k(k-1)\,\Omega_k^{c}\;c\,(1-c)^{\,k-2},
+\end{equation}
+so the effective diffusivity for the cathode particle is
+\begin{equation}
+D_{\mathrm{eff}}(c) = D\left[\frac{1}{1-c} + \frac{1}{RT}\sum_{k=2}^{7} k(k-1)\,\Omega_k^{c}\;c\,(1-c)^{\,k-2}\right].
+\label{eq:Deff_cathode}
+\end{equation}
+Note the extra factor of $c$ multiplying $(1-c)^{k-2}$: because the interaction sum in $\mu_{\mathrm{Li}}$ is a
+function of $(1-c)$ rather than $c$, the chain rule introduces this asymmetry relative to the anode's
+Eq.~\eqref{eq:Deff_anode}, and the two expressions are \emph{not} related by the naive substitution $c\to(1-c)$.
+The governing PDE and symmetry condition at $r=0$ retain the same form as Eqs.~\eqref{eq:pde_anode} and the first
+line of \eqref{eq:bc_anode}. The surface flux condition, initial condition, and voltage expression are
+\begin{align}
+\left.\frac{\partial c}{\partial r}\right|_{r=R} &= \frac{i_{\mathrm{app}}}{F\,D_{\mathrm{eff}}(c_s)}, \qquad
+c(r,0) = 0.99, \\[4pt]
+V &= V_0 + \frac{RT}{F}\ln\!\left(\frac{1-c_s}{c_s}\right) + \frac{1}{F}\sum_{k=2}^{7} k\,\Omega_k^{c}\,(1-c_s)^{\,k-1}.
+\label{eq:V_cathode}
+\end{align}
+With $i_{\mathrm{app}} = -1.0~\si{mA/cm^2}$ (Li\textsuperscript{+} leaving the cathode), $c_s$ decreases from 0.99 and
+the specific capacity referenced to the NMC111 mass is
+\begin{equation}
+Q_{\mathrm{sp}}(t) = \frac{F\,c_{\max}}{3600\,\rho_{\mathrm{NMC}}}\big(c_0 - c_s(t)\big)\ \ [\si{mAh/g}],
+\qquad
+\frac{F\,c_{\max}}{3600\,\rho_{\mathrm{NMC}}} = \SI{609.7}{mAh/g} \equiv Q_{\max}.
+\label{eq:Qsp}
+\end{equation}
+
+\subsection{Parameter fitting}
+$V_0$ and $\Omega_k^c$ ($k=2,\ldots,7$) were obtained by a constrained nonlinear least-squares fit
+(\texttt{scipy.optimize.curve\_fit}) of the equilibrium ($\eta = 0$) voltage--capacity relation, Eqs.~\eqref{eq:V_cathode}
+and \eqref{eq:Qsp}, to the twenty data points of Table 2, with bounds fixed to the ranges quoted in the project
+statement:
+\[
+V_0\in[3.0,4.0],\quad \Omega_2^c/F\in[-0.15,0],\quad \Omega_3^c/F\in[1.5,2.0],\quad \Omega_4^c/F\in[-3.2,-2.5],
+\]
+\[
+\Omega_5^c/F\in[10.0,14.0],\quad \Omega_6^c/F\in[11,15],\quad \Omega_7^c/F\in[-4.0,-2.5].
+\]
+The fit converged to the values in Table~\ref{tab:fit}, with an RMS residual of \SI{22}{mV} over the fitted range;
+the same optimum was recovered from several different starting points inside the bounds.
+
+\begin{table}[h]
+\centering
+\caption{Fitted NMC111 interaction parameters.}
+\label{tab:fit}
+\begin{tabular}{lc}
+\toprule
+Parameter & Fitted value \\
+\midrule
+$V_0$ & \SI{3.824}{V} \\
+$\Omega_2^c/F$ & $-0.000$~V \\
+$\Omega_3^c/F$ & $2.000$~V \\
+$\Omega_4^c/F$ & $-2.515$~V \\
+$\Omega_5^c/F$ & $10.000$~V \\
+$\Omega_6^c/F$ & $11.000$~V \\
+$\Omega_7^c/F$ & $-4.000$~V \\
+\midrule
+RMSE & \SI{22}{mV} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Transient SPM simulation}
+With the fitted parameters and the effective diffusivity of Eq.~\eqref{eq:Deff_cathode}, the transient PDE was
+solved with $D = 7\times10^{-15}~\si{m^2/s}$, $R_p = \SI{10}{\micro\metre}$, $c_{\max} = \SI{48000}{mol/m^3}$,
+$\rho_{\mathrm{NMC}} = \SI{2.11}{g/cm^3}$, and $i_{\mathrm{app}} = -1.0~\si{mA/cm^2}$.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.72\linewidth]{Problem2_updated.png}
+\caption{Simulated (fitted-parameter SPM) and experimental (Table 2) voltage vs. specific capacity for the
+NMC111 half-cell.}
+\label{fig:p2}
+\end{figure}
+\clearpage
+\section{Full-Cell Voltage vs. Specific Capacity}
+
+\subsection{Combining the half-cells}
+The full cell is obtained by running the anode model of Section 1 ($i_{\mathrm{app}} = +1.0~\si{mA/cm^2}$) and the
+cathode model of Section 2 ($i_{\mathrm{app}} = -1.0~\si{mA/cm^2}$) \emph{concurrently over the same physical time},
+consistent with the stated full-cell current $i_{\mathrm{app}} = 1.0~\si{mA/cm^2}$ (positive from cathode to anode).
+Because the same current density is applied to both electrodes for the same elapsed time, charge is conserved
+between them automatically -- no independent electrode-mass or loading ratio is required beyond the single-particle
+parameters already given in Problems 1 and 2. The full-cell voltage is then
+\begin{equation}
+V_{\mathrm{full}}(t) = V_{\mathrm{cathode}}(t) - V_{\mathrm{anode}}(t),
+\end{equation}
+reported against the cathode's own specific-capacity trace $Q_{\mathrm{sp}}(t)$ from Eq.~\eqref{eq:Qsp}. The curve is
+physically meaningful up to the point at which either electrode is exhausted; here the anode (the smaller-capacity
+electrode, given its particle size and site concentration) is the limiting electrode, and the trace is shown up to
+$\theta_{\mathrm{anode}}\to 1$.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.72\linewidth]{Problem3_updated.png}
+\caption{Full-cell voltage vs. specific capacity (NMC111 basis), obtained by combining the anode and cathode SPMs of
+Problems 1 and 2 at $i_{\mathrm{app}} = 1.0~\si{mA/cm^2}$.}
+\label{fig:p3}
+\end{figure}
+
+The full-cell curve (Fig.~\ref{fig:p3}) rises smoothly from about \SI{2.9}{V} at low capacity to over \SI{4.5}{V} as
+the anode approaches saturation, with the characteristic steep upturn near \SIrange{150}{175}{mAh/g} that reflects
+the anode voltage collapsing toward zero as $\theta_{\mathrm{anode}}\to1$ -- the expected signature of the
+capacity-limiting electrode in a full cell.
+\clearpage
+\section{Cyclic Full-Cell Voltage with Finite Exchange Current Density}
+
+\subsection{Butler--Volmer overpotential}
+For symmetry factor $\beta = 1/2$, the Butler--Volmer relation $i = i_{\mathrm{ex}}\big[e^{(1-\beta)f\eta} - e^{-\beta f\eta}\big]$
+inverts to
+\begin{equation}
+\eta = \frac{2RT}{F}\,\operatorname{asinh}\!\left(\frac{i_{\mathrm{app}}}{2\,i_{\mathrm{ex}}}\right).
+\label{eq:eta}
+\end{equation}
+Both electrode/electrolyte interfaces are assigned the same $i_{\mathrm{ex}}$. On \emph{discharge}
+($\mathrm{Li^+}$ moving cathode $\to$ anode reversed relative to Problem 3, i.e. the cell current sourced externally),
+each electrode reaction is displaced below its equilibrium potential in the direction that opposes the current, so
+the cell voltage is reduced relative to open circuit by twice the single-electrode overpotential; on \emph{charge}
+the current reverses and the same overpotential instead \emph{adds} to the open-circuit voltage:
+\begin{equation}
+V_{\mathrm{discharge}}(Q) = V_{\mathrm{OCV}}(Q) - 2\eta, \qquad
+V_{\mathrm{charge}}(Q) = V_{\mathrm{OCV}}(Q) + 2\eta,
+\label{eq:cycle}
+\end{equation}
+where $V_{\mathrm{OCV}}(Q)$ is the equilibrium full-cell curve of Fig.~\ref{fig:p3} (Section 3, $\eta=0$). One full
+cycle is constructed by evaluating Eq.~\eqref{eq:cycle} along the discharge leg from $Q=0$ up to the capacity limit,
+then back along the reversed state-of-charge path for the charge leg, plotted against cumulative throughput capacity.
+
+\subsection{Results}
+Figure~\ref{fig:p4} shows the resulting cycle for $i_{\mathrm{ex}} \in \{1, 10, 10^2, 10^3, 10^4\}~\si{mA/cm^2}$ at
+$|i_{\mathrm{app}}| = 1.0~\si{mA/cm^2}$. As Eq.~\eqref{eq:eta} predicts, $\eta \to 0$ once $i_{\mathrm{ex}} \gg
+i_{\mathrm{app}}$, so the $i_{\mathrm{ex}}\ge 10~\si{mA/cm^2}$ curves collapse onto the equilibrium curve and are
+indistinguishable from one another; only $i_{\mathrm{ex}} = 1~\si{mA/cm^2}$ (comparable in magnitude to
+$i_{\mathrm{app}}$) shows a visibly open hysteresis loop, with the charge leg running above and the discharge leg
+below the equilibrium curve by $2\eta \approx \SI{50}{mV}$ near mid-capacity.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{Problem4_updated.png}
+\caption{Cyclic full-cell voltage vs. throughput capacity for five exchange current densities,
+$|i_{\mathrm{app}}| = 1.0~\si{mA/cm^2}$.}
+\label{fig:p4}
+\end{figure}
+\clearpage
+\section*{Summary}
+A single-particle model was developed for the Carbon $|$ LiPF\textsubscript{6} $|$ NMC111 cell. The carbon anode
+half-cell (Section 1) reproduces the Verbrugge--Koch interaction-model voltage--occupancy curve directly from
+published parameters. The NMC111 half-cell (Section 2) uses an analogous thermodynamic-factor-corrected diffusivity,
+with its seven open interaction parameters obtained by constrained least-squares fitting to the reported
+voltage--capacity data (RMSE \SI{22}{mV}). Combining the two half-cell SPMs under a shared applied current
+(Section 3) yields a full-cell voltage--capacity curve that correctly reflects the anode as the capacity-limiting
+electrode. Finally, incorporating Butler--Volmer kinetics at finite exchange current density (Section 4) reproduces
+the expected narrowing of the charge/discharge hysteresis loop as $i_{\mathrm{ex}}$ increases, collapsing to the
+equilibrium curve once the exchange current density greatly exceeds the applied current density.
+
+\end{document}
