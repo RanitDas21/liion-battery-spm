@@ -39,5 +39,7 @@ See `Report/ME698V_MidTerm_Report.pdf` for the full derivations, methodology, an
 ## Author
 
 Ranit Das
+
 M.Tech - Solid Mechanics and Design
+
 IIT Kanpur
