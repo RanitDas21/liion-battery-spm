@@ -35,3 +35,9 @@ This project develops a Single-Particle Model (SPM) for a Carbon | LiPF₆ | NMC
 Each notebook in `Codes/` corresponds to one problem in the report and can be run independently in Jupyter. `Problem2.ipynb`/`Problem3.ipynb` save/consume `cathode_fit_params.npy` for the fitted cathode parameters used downstream.
 
 See `Report/ME698V_MidTerm_Report.pdf` for the full derivations, methodology, and results.
+
+## Author
+
+Ranit Das
+M.Tech - Solid Mechanics and Design
+IIT Kanpur
